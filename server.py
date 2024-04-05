@@ -1,6 +1,7 @@
 # импортируем библиотеки
-from flask import Flask, request, jsonify
 import logging
+
+from flask import Flask, request, jsonify
 
 # создаём приложение
 # мы передаём __name__, в нём содержится информация,
@@ -25,6 +26,8 @@ logging.basicConfig(level=logging.INFO)
 # Когда он откажется купить слона,
 # то мы уберем одну подсказку. Как будто что-то меняется :)
 sessionStorage = {}
+
+goods = ['слон', 'кролик']
 
 
 @app.route('/post', methods=['POST'])
@@ -68,22 +71,15 @@ def handle_dialog(req, res):
                 "Не хочу.",
                 "Не буду.",
                 "Отстань!",
-            ]
+            ],
+            'animal': 0
         }
         # Заполняем текст ответа
-        res['response']['text'] = 'Привет! Купи слона!'
+        res['response']['text'] = 'Привет! Купи ' + goods[sessionStorage[user_id]['animal']] + 'а!'
         # Получим подсказки
-        res['response']['buttons'] = get_suggests(user_id)
+        res['response']['buttons'] = get_suggests(user_id, goods[sessionStorage[user_id]['animal']])
         return
 
-    # Сюда дойдем только, если пользователь не новый,
-    # и разговор с Алисой уже был начат
-    # Обрабатываем ответ пользователя.
-    # В req['request']['original_utterance'] лежит весь текст,
-    # что нам прислал пользователь
-    # Если он написал 'ладно', 'куплю', 'покупаю', 'хорошо',
-    # то мы считаем, что пользователь согласился.
-    # Подумайте, всё ли в этом фрагменте написано "красиво"?
     if req['request']['original_utterance'].lower() in [
         'ладно',
         'куплю',
@@ -91,18 +87,25 @@ def handle_dialog(req, res):
         'хорошо'
     ]:
         # Пользователь согласился, прощаемся.
-        res['response']['text'] = 'Слона можно найти на Яндекс.Маркете!'
-        res['response']['end_session'] = True
+        if sessionStorage[user_id]['animal'] == len(goods) - 1:
+            res['response']['text'] = f'{goods[sessionStorage[user_id]["animal"]].capitalize()}а можно найти на Яндекс.Маркете!'
+            sessionStorage[user_id]['animal'] += 1
+            res['response']['end_session'] = True
+        else:
+            res['response']['text'] = f'{goods[sessionStorage[user_id]["animal"]].capitalize()}а можно найти на Яндекс.Маркете!'
+            sessionStorage[user_id]['animal'] += 1
+            res['response']['text'] = 'A ' + goods[sessionStorage[user_id]["animal"]] + 'а купишь?'
+            res['response']['buttons'] = get_suggests(user_id, goods[sessionStorage[user_id]['animal']])
         return
 
     # Если нет, то убеждаем его купить слона!
     res['response']['text'] = \
         f"Все говорят '{req['request']['original_utterance']}', а ты купи слона!"
-    res['response']['buttons'] = get_suggests(user_id)
+    res['response']['buttons'] = get_suggests(user_id, goods[sessionStorage[user_id]['animal']])
 
 
 # Функция возвращает две подсказки для ответа.
-def get_suggests(user_id):
+def get_suggests(user_id, goods):
     session = sessionStorage[user_id]
 
     # Выбираем две первые подсказки из массива.
@@ -120,7 +123,7 @@ def get_suggests(user_id):
     if len(suggests) < 2:
         suggests.append({
             "title": "Ладно",
-            "url": "https://market.yandex.ru/search?text=слон",
+            "url": "https://market.yandex.ru/search?text=" + goods,
             "hide": True
         })
 
